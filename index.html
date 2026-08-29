@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Zilla+Slab:wght@400;500;600&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --turf-dark: #142E24;
@@ -153,9 +154,67 @@
     background: none; border: 1px solid var(--loss); color: var(--loss);
     flex: none; width: 40px;
   }
+
+  .kt-auth-wrap {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .kt-auth-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 26px 22px;
+    width: 100%; max-width: 320px;
+  }
+  .kt-auth-title {
+    font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 20px; color: var(--turf);
+    margin-bottom: 4px; text-align: center;
+  }
+  .kt-auth-sub { text-align: center; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 18px; }
+  .kt-auth-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .kt-btn-outline {
+    background: none; border: 1px solid var(--turf); color: var(--turf);
+  }
+  .kt-auth-msg { font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+  .kt-auth-msg.error { color: var(--loss); }
+  .kt-auth-msg.info { color: var(--win); }
+
+  .kt-user-bar {
+    max-width: 640px; margin: 0 auto 14px; display: flex; align-items: center; justify-content: space-between;
+    font-family: 'Oswald', sans-serif; font-size: 12px; color: var(--ink-soft);
+  }
+  .kt-logout-btn {
+    background: none; border: 1px solid var(--line); border-radius: 5px; padding: 5px 10px;
+    color: var(--ink-soft); cursor: pointer; font-family: 'Oswald', sans-serif; font-size: 11.5px;
+  }
+  .kt-logout-btn:hover { border-color: var(--loss); color: var(--loss); }
+  #appRoot { display: none; }
 </style>
 </head>
 <body>
+
+<div class="kt-auth-wrap" id="authScreen">
+  <div class="kt-auth-card">
+    <div class="kt-auth-title">競馬収支</div>
+    <div class="kt-auth-sub">メールアドレスでログイン</div>
+    <div class="kt-field">
+      <label>メールアドレス</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="kt-field">
+      <label>パスワード</label>
+      <input type="password" id="authPassword" placeholder="8文字以上" autocomplete="current-password" />
+    </div>
+    <div class="kt-auth-actions">
+      <button class="kt-btn kt-btn-save" onclick="handleSignIn()">ログイン</button>
+      <button class="kt-btn kt-btn-outline" onclick="handleSignUp()">新規登録</button>
+    </div>
+    <div class="kt-auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<div id="appRoot">
+
+<div class="kt-user-bar">
+  <span id="userEmailLabel"></span>
+  <button class="kt-logout-btn" onclick="handleSignOut()">ログアウト</button>
+</div>
 
 <div class="kt-title-row">
   <div>
@@ -227,13 +286,21 @@
   </div>
 </div>
 
+</div>
+
 <script>
-const STORAGE_KEY = 'keiba-entries';
+// ▼▼▼ ここを自分のSupabaseプロジェクトの値に書き換えてください ▼▼▼
+const SUPABASE_URL = 'https://tivkwokgvukmtotkzadl.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_sb-V2FIbVv8Sr2jXJ7LaVA_W_EXOJNr';
+// ▲▲▲ ここまで ▲▲▲
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const YOUBI = ['日','月','火','水','木','金','土'];
 const today = new Date();
 
 let entries = {};
-try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { entries = {}; }
+let currentUser = null;
 
 let viewYear = today.getFullYear();
 let viewMonth = today.getMonth();
@@ -251,9 +318,66 @@ function rate(bet, ret) {
   if (!bet) return null;
   return (ret / bet) * 100;
 }
-function saveEntries() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+
+// ---- 認証 ----
+function setAuthMsg(text, type) {
+  const el = document.getElementById('authMsg');
+  el.textContent = text;
+  el.className = 'kt-auth-msg' + (type ? ' ' + type : '');
 }
+
+async function handleSignIn() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!email || !password) { setAuthMsg('メールアドレスとパスワードを入力してください', 'error'); return; }
+  setAuthMsg('ログイン中...', '');
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) setAuthMsg(error.message, 'error');
+}
+
+async function handleSignUp() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!email || !password) { setAuthMsg('メールアドレスとパスワードを入力してください', 'error'); return; }
+  setAuthMsg('登録中...', '');
+  const { error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) { setAuthMsg(error.message, 'error'); return; }
+  setAuthMsg('確認メールを送信しました。メール内のリンクを開いてから、このページでログインしてください。', 'info');
+}
+
+async function handleSignOut() {
+  await supabaseClient.auth.signOut();
+}
+
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+  if (session && session.user) {
+    currentUser = session.user;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appRoot').style.display = 'block';
+    document.getElementById('userEmailLabel').textContent = currentUser.email;
+    loadEntries();
+  } else {
+    currentUser = null;
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appRoot').style.display = 'none';
+  }
+});
+
+// ---- データ読み込み ----
+async function loadEntries() {
+  const { data, error } = await supabaseClient.from('entries').select('date, bet, ret');
+  if (error) {
+    console.error(error);
+    alert('データの読み込みに失敗しました: ' + error.message);
+    return;
+  }
+  entries = {};
+  data.forEach(row => {
+    entries[row.date] = { bet: row.bet, ret: row.ret };
+  });
+  renderAll();
+}
+
 function aggregate(filterFn) {
   let bet = 0, ret = 0;
   for (const k in entries) {
@@ -432,26 +556,32 @@ function updatePreview() {
 document.getElementById('formBet').addEventListener('input', updatePreview);
 document.getElementById('formRet').addEventListener('input', updatePreview);
 
-function saveEntry() {
+async function saveEntry() {
   const bet = Number(document.getElementById('formBet').value) || 0;
   const ret = Number(document.getElementById('formRet').value) || 0;
   if (bet === 0 && ret === 0) {
-    delete entries[modalDate];
-  } else {
-    entries[modalDate] = { bet, ret };
+    await deleteEntry();
+    return;
   }
-  saveEntries();
+  const { error } = await supabaseClient
+    .from('entries')
+    .upsert({ user_id: currentUser.id, date: modalDate, bet, ret }, { onConflict: 'user_id,date' });
+  if (error) { alert('保存に失敗しました: ' + error.message); return; }
+  entries[modalDate] = { bet, ret };
   closeModal();
   renderAll();
 }
-function deleteEntry() {
+async function deleteEntry() {
+  const { error } = await supabaseClient
+    .from('entries')
+    .delete()
+    .eq('date', modalDate);
+  if (error) { alert('削除に失敗しました: ' + error.message); return; }
   delete entries[modalDate];
-  saveEntries();
   closeModal();
   renderAll();
 }
 
-renderAll();
 </script>
 </body>
 </html>
