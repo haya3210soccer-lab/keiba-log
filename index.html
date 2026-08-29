@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="回収率トラッカー" />
+<title>回収率トートボード | 競馬収支トラッカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Zilla+Slab:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --turf-dark: #142E24;
+    --turf: #1B4332;
+    --paper: #F3EEE1;
+    --paper-dim: #E9E1CB;
+    --ink: #211F1A;
+    --ink-soft: #6B6656;
+    --amber: #E7A33E;
+    --amber-soft: #F2C77E;
+    --win: #2D6A4F;
+    --win-bg: #E4F0E9;
+    --loss: #A6373B;
+    --loss-bg: #F5E6E4;
+    --line: #D9D2BB;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Zilla Slab', serif;
+    background: var(--paper);
+    color: var(--ink);
+    padding: 24px 16px 60px;
+  }
+  .kt-title-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    max-width: 640px; margin: 0 auto 22px;
+    border-bottom: 3px solid var(--turf); padding-bottom: 12px;
+  }
+  .kt-title {
+    font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 24px;
+    letter-spacing: 0.04em; color: var(--turf); text-transform: uppercase;
+  }
+  .kt-title span { color: var(--amber-soft); background: var(--turf); padding: 2px 8px; }
+  .kt-subtitle { font-size: 12.5px; color: var(--ink-soft); font-style: italic; }
+
+  .kt-boards { max-width: 640px; margin: 0 auto 28px; }
+  .kt-board {
+    background: var(--turf-dark); border-radius: 6px; padding: 22px 20px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.15); position: relative; overflow: hidden;
+  }
+  .kt-board-label {
+    font-family: 'Oswald', sans-serif; font-size: 12.5px; letter-spacing: 0.15em;
+    color: var(--amber-soft); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .kt-board-num {
+    font-family: 'Oswald', sans-serif; font-variant-numeric: tabular-nums;
+    font-size: 38px; font-weight: 600; color: var(--amber); letter-spacing: 0.02em;
+  }
+  .kt-board-num.neg { color: #E8817F; }
+  .kt-board-sub { margin-top: 4px; font-size: 14px; color: #C9C2A4; }
+
+  .kt-boards-secondary { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kt-board-mini {
+    border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  }
+  .kt-board-mini .kt-board-label { color: var(--ink-soft); margin-bottom: 0; font-size: 10.5px; }
+  .kt-board-mini .kt-board-num { font-size: 15px; color: var(--turf); }
+  .kt-board-mini .kt-board-num.neg { color: var(--loss); }
+  .kt-board-mini .kt-board-sub { font-size: 10.5px; color: var(--ink-soft); margin-top: 0; }
+  .kt-board-mini-text { display: flex; flex-direction: column; align-items: flex-end; }
+
+  .kt-panel {
+    max-width: 640px; margin: 0 auto 24px; background: #fff;
+    border: 1px solid var(--line); border-radius: 8px; padding: 16px;
+  }
+  .kt-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .kt-nav-btn {
+    background: var(--paper-dim); border: 1px solid var(--line); border-radius: 5px;
+    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--turf); font-size: 16px; user-select: none;
+  }
+  .kt-nav-btn:active { background: var(--amber-soft); }
+  .kt-month-label { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; color: var(--turf); }
+
+  .kt-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .kt-dow { text-align: center; font-size: 10.5px; color: var(--ink-soft); font-family: 'Oswald', sans-serif; padding-bottom: 4px; }
+  .kt-cell {
+    min-height: 50px; border-radius: 5px; border: 1px solid var(--line); background: var(--paper-dim);
+    padding: 4px 5px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .kt-cell.empty-cell { visibility: hidden; }
+  .kt-cell.win { background: var(--win-bg); border-color: #BFDCCB; }
+  .kt-cell.loss { background: var(--loss-bg); border-color: #E6BFBE; }
+  .kt-cell.today { outline: 2px solid var(--amber); outline-offset: -2px; }
+  .kt-cell-day { font-size: 11px; color: var(--ink-soft); font-family: 'Oswald', sans-serif; }
+  .kt-cell-num { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600; text-align: right; }
+  .kt-cell.win .kt-cell-num { color: var(--win); }
+  .kt-cell.loss .kt-cell-num { color: var(--loss); }
+
+  .kt-summary-row {
+    margin-top: 12px; display: flex; gap: 16px; font-family: 'Oswald', sans-serif;
+    font-size: 12px; color: var(--ink-soft); border-top: 1px dashed var(--line); padding-top: 10px; flex-wrap: wrap;
+  }
+  .kt-summary-row b { color: var(--turf); }
+
+  .kt-chart-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .kt-chart-title { font-family: 'Oswald', sans-serif; font-weight: 600; color: var(--turf); }
+  .kt-year-select {
+    font-family: 'Oswald', sans-serif; border: 1px solid var(--line); border-radius: 5px;
+    padding: 4px 8px; background: var(--paper-dim); color: var(--turf); font-weight: 600;
+  }
+  #chartCanvas { max-height: 230px; }
+
+  .kt-modal-backdrop {
+    position: fixed; inset: 0; background: rgba(20,46,36,0.55);
+    display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .kt-modal-backdrop.open { display: flex; }
+  .kt-modal {
+    background: var(--paper); border-radius: 8px; padding: 22px; width: 100%; max-width: 340px;
+    border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  .kt-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .kt-modal-title { font-family: 'Oswald', sans-serif; font-weight: 600; color: var(--turf); font-size: 16px; }
+  .kt-close-btn { cursor: pointer; color: var(--ink-soft); background: none; border: none; font-size: 18px; }
+  .kt-field { margin-bottom: 12px; }
+  .kt-field label {
+    display: block; font-size: 12px; color: var(--ink-soft); margin-bottom: 4px;
+    font-family: 'Oswald', sans-serif; letter-spacing: 0.04em;
+  }
+  .kt-field input {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 5px;
+    font-family: 'Zilla Slab', serif; font-size: 15px; background: #fff;
+  }
+  .kt-field input:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
+  .kt-preview {
+    font-family: 'Oswald', sans-serif; font-size: 14px; margin-bottom: 16px;
+    padding: 8px 10px; border-radius: 5px; background: var(--turf-dark); color: var(--amber);
+  }
+  .kt-modal-actions { display: flex; gap: 8px; }
+  .kt-btn {
+    flex: 1; padding: 10px; border-radius: 5px; border: none;
+    font-family: 'Oswald', sans-serif; font-weight: 600; cursor: pointer;
+  }
+  .kt-btn-save { background: var(--turf); color: #fff; }
+  .kt-btn-delete {
+    background: none; border: 1px solid var(--loss); color: var(--loss);
+    flex: none; width: 40px;
+  }
+</style>
+</head>
+<body>
+
+<div class="kt-title-row">
+  <div>
+    <div class="kt-title">回収率<span>トートボード</span></div>
+    <div class="kt-subtitle">競馬収支トラッカー</div>
+  </div>
+</div>
+
+<div class="kt-boards">
+  <div class="kt-board">
+    <div class="kt-board-label" id="mainLabel"></div>
+    <div class="kt-board-num" id="mainNum"></div>
+    <div class="kt-board-sub" id="mainRate"></div>
+  </div>
+  <div class="kt-boards-secondary">
+    <div class="kt-board-mini">
+      <div class="kt-board-label" id="yearLabel"></div>
+      <div class="kt-board-mini-text">
+        <div class="kt-board-num" id="yearNum"></div>
+        <div class="kt-board-sub" id="yearRate"></div>
+      </div>
+    </div>
+    <div class="kt-board-mini">
+      <div class="kt-board-label">全期間累計</div>
+      <div class="kt-board-mini-text">
+        <div class="kt-board-num" id="cumNum"></div>
+        <div class="kt-board-sub" id="cumRate"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="kt-panel">
+  <div class="kt-panel-head">
+    <button class="kt-nav-btn" onclick="changeMonth(-1)">‹</button>
+    <div class="kt-month-label" id="monthLabel"></div>
+    <button class="kt-nav-btn" onclick="changeMonth(1)">›</button>
+  </div>
+  <div class="kt-grid" id="calendarGrid"></div>
+  <div class="kt-summary-row">
+    <div>掛け金合計 <b id="monthBet"></b></div>
+    <div>払戻金合計 <b id="monthRet"></b></div>
+  </div>
+</div>
+
+<div class="kt-panel">
+  <div class="kt-chart-head">
+    <span class="kt-chart-title">月別推移</span>
+    <select class="kt-year-select" id="chartYearSelect" onchange="onChartYearChange()"></select>
+  </div>
+  <canvas id="chartCanvas"></canvas>
+</div>
+
+<div class="kt-modal-backdrop" id="modalBackdrop" onclick="closeModalOnBackdrop(event)">
+  <div class="kt-modal" onclick="event.stopPropagation()">
+    <div class="kt-modal-head">
+      <div class="kt-modal-title" id="modalTitle"></div>
+      <button class="kt-close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="kt-field">
+      <label>掛け金合計(円)</label>
+      <input type="number" inputmode="numeric" id="formBet" placeholder="0" />
+    </div>
+    <div class="kt-field">
+      <label>払戻金合計(円)</label>
+      <input type="number" inputmode="numeric" id="formRet" placeholder="0" />
+    </div>
+    <div class="kt-preview" id="formPreview">収支: 0円</div>
+    <div class="kt-modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'keiba-entries';
+const YOUBI = ['日','月','火','水','木','金','土'];
+const today = new Date();
+
+let entries = {};
+try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { entries = {}; }
+
+let viewYear = today.getFullYear();
+let viewMonth = today.getMonth();
+let chartYear = today.getFullYear();
+let modalDate = null;
+let chartInstance = null;
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function dateKey(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
+function yen(n) {
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${Math.round(n).toLocaleString('ja-JP')}`;
+}
+function rate(bet, ret) {
+  if (!bet) return null;
+  return (ret / bet) * 100;
+}
+function saveEntries() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+function aggregate(filterFn) {
+  let bet = 0, ret = 0;
+  for (const k in entries) {
+    if (filterFn(k)) { bet += entries[k].bet; ret += entries[k].ret; }
+  }
+  return { bet, ret, profit: ret - bet, rate: rate(bet, ret) };
+}
+
+function renderBoards() {
+  const monthly = aggregate(k => k.startsWith(`${viewYear}-${pad(viewMonth + 1)}-`));
+  const yearly = aggregate(k => k.startsWith(`${viewYear}-`));
+  const cumulative = aggregate(() => true);
+
+  document.getElementById('mainLabel').textContent = `${viewYear}年${viewMonth + 1}月の収支`;
+  const mainNumEl = document.getElementById('mainNum');
+  mainNumEl.textContent = `${yen(monthly.profit)}円`;
+  mainNumEl.className = 'kt-board-num' + (monthly.profit < 0 ? ' neg' : '');
+  document.getElementById('mainRate').textContent = `回収率 ${monthly.rate === null ? '—' : monthly.rate.toFixed(1) + '%'}`;
+
+  document.getElementById('yearLabel').textContent = `${viewYear}年累計`;
+  const yearNumEl = document.getElementById('yearNum');
+  yearNumEl.textContent = `${yen(yearly.profit)}円`;
+  yearNumEl.className = 'kt-board-num' + (yearly.profit < 0 ? ' neg' : '');
+  document.getElementById('yearRate').textContent = `回収率 ${yearly.rate === null ? '—' : yearly.rate.toFixed(1) + '%'}`;
+
+  const cumNumEl = document.getElementById('cumNum');
+  cumNumEl.textContent = `${yen(cumulative.profit)}円`;
+  cumNumEl.className = 'kt-board-num' + (cumulative.profit < 0 ? ' neg' : '');
+  document.getElementById('cumRate').textContent = `回収率 ${cumulative.rate === null ? '—' : cumulative.rate.toFixed(1) + '%'}`;
+
+  document.getElementById('monthBet').textContent = `${monthly.bet.toLocaleString('ja-JP')}円`;
+  document.getElementById('monthRet').textContent = `${monthly.ret.toLocaleString('ja-JP')}円`;
+}
+
+function renderCalendar() {
+  document.getElementById('monthLabel').textContent = `${viewYear}年 ${viewMonth + 1}月`;
+  const grid = document.getElementById('calendarGrid');
+  grid.innerHTML = '';
+  YOUBI.forEach(w => {
+    const d = document.createElement('div');
+    d.className = 'kt-dow';
+    d.textContent = w;
+    grid.appendChild(d);
+  });
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const numDays = new Date(viewYear, viewMonth + 1, 0).getDate();
+  for (let i = 0; i < firstDay; i++) {
+    const c = document.createElement('div');
+    c.className = 'kt-cell empty-cell';
+    grid.appendChild(c);
+  }
+  for (let d = 1; d <= numDays; d++) {
+    const key = dateKey(viewYear, viewMonth, d);
+    const e = entries[key];
+    const profit = e ? e.ret - e.bet : null;
+    const cell = document.createElement('div');
+    let cls = 'kt-cell';
+    if (e) cls += profit >= 0 ? ' win' : ' loss';
+    if (d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear()) cls += ' today';
+    cell.className = cls;
+    cell.onclick = () => openModal(key);
+    cell.innerHTML = `<div class="kt-cell-day">${d}</div>` + (e ? `<div class="kt-cell-num">${yen(profit)}</div>` : '');
+    grid.appendChild(cell);
+  }
+}
+
+function renderChartYearOptions() {
+  const select = document.getElementById('chartYearSelect');
+  const years = new Set([today.getFullYear()]);
+  Object.keys(entries).forEach(k => years.add(Number(k.slice(0, 4))));
+  const sorted = Array.from(years).sort((a, b) => b - a);
+  select.innerHTML = sorted.map(y => `<option value="${y}" ${y === chartYear ? 'selected' : ''}>${y}年</option>`).join('');
+}
+
+function renderChart() {
+  const labels = [];
+  const profits = [];
+  const colors = [];
+  for (let m = 0; m < 12; m++) {
+    const agg = aggregate(k => k.startsWith(`${chartYear}-${pad(m + 1)}-`));
+    labels.push(`${m + 1}月`);
+    profits.push(agg.profit);
+    colors.push(agg.profit >= 0 ? '#2D6A4F' : '#A6373B');
+  }
+  const ctx = document.getElementById('chartCanvas').getContext('2d');
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '収支',
+          data: profits,
+          backgroundColor: colors,
+          borderRadius: 3,
+          maxBarThickness: 30
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `収支: ${yen(ctx.parsed.y)}円`
+          }
+        }
+      },
+      scales: {
+        y: {
+          title: { display: true, text: '収支(円)', font: { family: 'Oswald', size: 11 } },
+          ticks: { font: { family: 'Oswald', size: 10 }, callback: (v) => v.toLocaleString('ja-JP') }
+        },
+        x: { ticks: { font: { family: 'Oswald', size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderAll() {
+  renderBoards();
+  renderCalendar();
+  renderChartYearOptions();
+  renderChart();
+}
+
+function changeMonth(delta) {
+  viewMonth += delta;
+  if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+  else if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+  renderAll();
+}
+
+function onChartYearChange() {
+  chartYear = Number(document.getElementById('chartYearSelect').value);
+  renderChart();
+}
+
+function openModal(key) {
+  modalDate = key;
+  const e = entries[key];
+  document.getElementById('modalTitle').textContent = key;
+  document.getElementById('formBet').value = e ? e.bet : '';
+  document.getElementById('formRet').value = e ? e.ret : '';
+  updatePreview();
+  const actions = document.getElementById('modalActions');
+  actions.innerHTML = '';
+  if (e) {
+    const delBtn = document.createElement('button');
+    delBtn.className = 'kt-btn kt-btn-delete';
+    delBtn.textContent = '削除';
+    delBtn.onclick = deleteEntry;
+    actions.appendChild(delBtn);
+  }
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'kt-btn kt-btn-save';
+  saveBtn.textContent = '保存する';
+  saveBtn.onclick = saveEntry;
+  actions.appendChild(saveBtn);
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modalBackdrop').classList.remove('open');
+  modalDate = null;
+}
+function closeModalOnBackdrop(ev) {
+  if (ev.target.id === 'modalBackdrop') closeModal();
+}
+function updatePreview() {
+  const bet = Number(document.getElementById('formBet').value) || 0;
+  const ret = Number(document.getElementById('formRet').value) || 0;
+  document.getElementById('formPreview').textContent = `収支: ${yen(ret - bet)}円`;
+}
+document.getElementById('formBet').addEventListener('input', updatePreview);
+document.getElementById('formRet').addEventListener('input', updatePreview);
+
+function saveEntry() {
+  const bet = Number(document.getElementById('formBet').value) || 0;
+  const ret = Number(document.getElementById('formRet').value) || 0;
+  if (bet === 0 && ret === 0) {
+    delete entries[modalDate];
+  } else {
+    entries[modalDate] = { bet, ret };
+  }
+  saveEntries();
+  closeModal();
+  renderAll();
+}
+function deleteEntry() {
+  delete entries[modalDate];
+  saveEntries();
+  closeModal();
+  renderAll();
+}
+
+renderAll();
+</script>
+</body>
+</html>
