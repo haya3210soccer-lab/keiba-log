@@ -559,6 +559,18 @@ document.getElementById('formRet').addEventListener('input', updatePreview);
 async function saveEntry() {
   const bet = Number(document.getElementById('formBet').value) || 0;
   const ret = Number(document.getElementById('formRet').value) || 0;
+
+    // マイナスの入力を禁止
+  if (bet < 0) {
+    alert('掛け金は0円以上で入力してください。');
+    return;
+  }
+
+  if (ret < 0) {
+    alert('払戻金は0円以上で入力してください。');
+    return;
+  }
+  
   if (bet === 0 && ret === 0) {
     await deleteEntry();
     return;
